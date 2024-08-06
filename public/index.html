@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Balls Experiment</title>
+    <!-- Import JsPsych CSS -->
+
+    <script src="https://unpkg.com/jspsych@8.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
+    <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+      /* Add custom styles for the balls */
+      .ball {
+        border-radius: 50%;
+        display: inline-block;
+        background-color: #0084ff;
+        border: 1px solid #000;
+      }
+      body {
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f4f4f9;
+      }
+      .jspsych-btn {
+        font-size: 18px;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        background-color: #28a745;
+        color: white;
+        margin-top: 20px;
+      }
+      .jspsych-display-element {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+</head>
+<body>
+    <!-- Container for the experiment -->
+    <div id="jspsych-target"></div>
+
+    <script>
+      // Initial instructions
+      var instructions = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+          <div style="font-size: 24px; text-align: center;">
+            <p>Select with the mouse the smallest ball in each group.</p>
+            <p>You can see your hits and errors on the screen.</p>
+            <p>Try to be quick because you only have five seconds to respond.</p>
+          </div>`,
+        choices: ['Understood'],
+      };
+
+      // Cross before starting the task
+      var fixation = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: '<div style="font-size: 48px; text-align: center;">+</div>',
+        choices: ['Start'],
+      };
+
+      // Function to create a trial with specified ball sizes
+      function createTrial(ballSizes, correctIndex, setNumber) {
+        let mult = 300;
+        return {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: function() {
+            console.log("correct Index: ",correctIndex)
+            const ballDivs = ballSizes.map((size, index) => 
+              `<div class='ball' style='border:none;width:${(size/100.0) * mult}px;height:${(size/100.0) * mult}px;' id='ball-${index}'></div>`
+            ).join('');
+            return `<div id='ball-container' style='display:flex;justify-content:space-around; width:'>${ballDivs}</div>`;
+          },
+          choices: ballSizes.map((_, index) => `Ball ${index + 1}`),
+          trial_duration: 5000, // 5 seconds to respond
+          on_finish: function(data) {
+            // Determine which ball was chosen
+            
+            const responseIndex = data.response;
+            data.chosenIndex = responseIndex;
+            data.correct = responseIndex === correctIndex;
+            data.correctIndex = correctIndex;
+            data.ballSizes = ballSizes;
+            data.setNumber = setNumber;
+            data.omission = responseIndex === null; // If no response
+            console.log("data.response: ", data.response);
+            console.log("data.correct: ", data.correct);
+          }
+        };
+      }
+
+      // Set 1 and Set 3: 20 Trials with 5% difference
+      var set1 = [];
+      var set3 = [];
+
+      const set1and3size = 5;
+      const set2size = 5;
+
+      for (let i = 0; i < set1and3size; i++) {
+        let diff = 2;
+        let base_size = Math.floor(Math.random() * 10) + 25;
+        let ballSizes = [base_size + diff,base_size + 2 * diff,base_size + 3 * diff].sort(() => Math.random() - 0.5);
+        let correctIndex = ballSizes.indexOf(Math.min(...ballSizes)); // The first ball is always the smallest
+        set1.push(createTrial(ballSizes, correctIndex, 1));
+        set3.push(createTrial(ballSizes, correctIndex, 3));
+      }
+
+      // Set 2: 40 Trials with 2% difference
+      var set2 = [];
+      for (let i = 0; i < set2size; i++) {
+        let diff = 1;
+        let base_size = Math.floor(Math.random() * 10) + 25;
+        let ballSizes = [base_size + diff, base_size + 2 * diff, base_size + 3 * diff].sort(() => Math.random() - 0.5);
+        let correctIndex = ballSizes.indexOf(Math.min(...ballSizes)); // The first ball is always the smallest
+        set2.push(createTrial(ballSizes, correctIndex, 2));
+      }
+
+      // Feedback after each set
+      function createFeedback(setNumber) {
+        return {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: function() {
+            let trials = jsPsych.data.get().filter({ setNumber: setNumber });
+            let hits = trials.filter({ correct: true }).count();
+            let errors = trials.filter({ correct: false }).count();
+            let omissions = trials.filter({ omission: true }).count();
+
+            return `
+              <div style='font-size:24px;text-align:center;'>
+                <p>Set ${setNumber} Complete!</p>
+                <p>Hits: ${hits}</p>
+                <p>Errors: ${errors}</p>
+                <p>Omissions: ${omissions}</p>
+              </div>`;
+          },
+          choices: ['Next'],
+          trial_duration: 5000, // Show feedback for 5 seconds
+        };
+      }
+
+      // End screen
+      var endScreen = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: '<div style="font-size: 24px; text-align: center;">Thank you for participating!</div>',
+        choices: ['End'],
+        on_finish: function() {
+          jsPsych.data.displayData(); // Display the collected data
+        }
+      };
+
+      // Experiment timeline
+      var timeline = [];
+
+      // Add instructions
+      timeline.push(instructions, fixation);
+
+      // Add Set 1
+      timeline.push(...set1);
+      timeline.push(createFeedback(1));
+
+      // Add Set 2
+      timeline.push(...set2);
+      timeline.push(createFeedback(2));
+
+      // Add Set 3
+      timeline.push(...set3);
+      timeline.push(createFeedback(3));
+
+      // End screen
+      timeline.push(endScreen);
+
+      // Initialize the JsPsych experiment
+
+      const jsPsych = initJsPsych({display_element: 'jspsych-target', 
+      on_finish: function() {
+        jsPsych.data.displayData(); // Optionally display the data
+      }});
+
+      jsPsych.run(timeline);
+    </script>
+</body>
+</html>
