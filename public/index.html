@@ -8,7 +8,10 @@
 
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
+    <script src="js/s3.js"></script>
     <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
+
+
     <style>
       /* Add custom styles for the balls */
       .ball {
@@ -47,6 +50,40 @@
     <div id="jspsych-target"></div>
 
     <script>
+      var goodbye = {
+
+        type: jsPsychHtmlButtonResponse,
+
+        stimulus: "Thank you for participating in this experiment!",
+
+        choices:['Done'],
+
+        on_start: function(data) {
+            
+            var subjID = jsPsych.data.get().last(1).values()[0]['participantID'];
+
+            var rows = {trial_type: jsPsychHtmlButtonResponse.info.name}; // we are only interested in our main stimulus, not fixation, feedback etc.
+
+            console.log(jsPsychHtmlButtonResponse.info.name);
+
+            console.log("jsPsych.data.get()");
+            console.log(jsPsych.data.get());
+
+            console.log("jsPsych.data.get().filter(rows)");
+            console.log(jsPsych.data.get().filter(rows));
+
+            var selected_data = jsPsych.data.get().filter(rows);
+            
+            // the next piece of codes orders the columns of the data file
+            var d = selected_data.values() // get the data values
+
+            uploadData(subjID ,selected_data.csv()).then(() => {
+                fetchS3ObjectList('beach_ball_task_data');
+            });
+
+        }
+      };
+
       // Initial instructions
       var instructions = {
         type: jsPsychHtmlButtonResponse,
@@ -100,8 +137,8 @@
       var set1 = [];
       var set3 = [];
 
-      const set1and3size = 5;
-      const set2size = 5;
+      const set1and3size = 1;
+      const set2size = 1;
 
       for (let i = 0; i < set1and3size; i++) {
         let diff = 2;
@@ -175,13 +212,13 @@
 
       // End screen
       timeline.push(endScreen);
+      timeline.push(goodbye);
 
       // Initialize the JsPsych experiment
 
-      const jsPsych = initJsPsych({display_element: 'jspsych-target', 
-      on_finish: function() {
-        jsPsych.data.displayData(); // Optionally display the data
-      }});
+      const jsPsych = initJsPsych({
+        display_element: 'jspsych-target', 
+    });
 
       jsPsych.run(timeline);
     </script>
